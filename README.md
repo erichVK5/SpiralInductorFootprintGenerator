@@ -41,9 +41,9 @@ Usage:
 
 Example usage:
 
-	java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -l 3000 -s
+	java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -l 3000
 
-	generates a 40 turn square inductor footprint,
+	generates a 40 turn helical inductor footprint,
 	of 15mm inside diameter, 50 mm outside diameter,
 	with 0.25mm track width and 3mm segment length.
 

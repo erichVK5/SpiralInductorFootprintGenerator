@@ -392,8 +392,8 @@ public class SpiralInductorFootprintGenerator
 			"\n\t\t-l long\t length of segment used to approximate circular arc in nanometres\n" +
 			"\n\t\t-h\t prints this\n\n" +
 			"Example usage:\n\n\t" +
-			"java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -l 3000 -s\n\n\t" +
-			"generates a 40 turn square inductor footprint,\n\t" +
+			"java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -l 3000\n\n\t" +
+			"generates a 40 turn helical inductor footprint,\n\t" +
 			"of 15mm inside diameter, 50 mm outside diameter,\n\t" +
 			"with 0.25mm track width and 3mm segment length.\n");
 	}
