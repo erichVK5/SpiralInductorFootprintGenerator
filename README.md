@@ -27,15 +27,15 @@ Usage:
 
 		-s	export a square inductor, default is circular
 
-		-i long	 inner diameter of coil in nanometres
+		-i long	 inner diameter of coil in microns
 
-		-o long	 outer diameter of coil in nanometres
+		-o long	 outer diameter of coil in microns
 
-		-w long	 track width in nanometres
+		-w long	 track width in microns
 
 		-n long	 number of turns
 
-		-l long	 length of segment used to approximate circular arc in nanometres
+		-l long	 length of segment used to approximate circular arc in microns
 
 		-h	 prints this
 

@@ -34,17 +34,18 @@ public class SpiralInductorFootprintGenerator
 
 		// some default values for a spiral inductor vaguely OK for Qi applications
 
-		long innerDiameter = 27100; // nm
-                long outerDiameter = 32000; // nm
-                long segmentLength = 1000; // 1mm length
+		long innerDiameter = 27100; // microns
+                long outerDiameter = 32000; // microns
+                long segmentLength = 1000; // 1mm length in microns
                 int turnsTotal = 9;
-                long trackWidth = 220; // nm
+                long trackWidth = 220; // microns
                         // (((outerDiameter-innerDiameter)/2-(turnsTotal-1)*trackGap))/turnsTotal;
 
                 boolean theOneTrueEDAsuiteGEDA = true;
                 	// obviously, !theOneTrueEDAsuiteGEDA = kicad :-)
 
 		boolean squareCoil = false;
+		boolean hexagonalCoil = false;
 
 		// we now parse arguments parsed via the command line
 
@@ -120,15 +121,36 @@ public class SpiralInductorFootprintGenerator
 		// we now define some flags
 		boolean nextTurnPlease = false;
 
-                long trackGap = (long)((outerDiameter - innerDiameter)/2.0 - (turnsTotal*trackWidth))/(turnsTotal-1); // nm
+		long trackGap = 0; // in microns
+
+		if (turnsTotal > 1) // the usual scenario
+		{
+                	trackGap = (long)((outerDiameter - innerDiameter)/2.0 - (turnsTotal*trackWidth))/(turnsTotal-1); // nm
+		}
+		else // stops a divide by zero error if only one loop requested
+		{
+			trackGap = (long)startRadius;
+		}
 
 		double radiusIncrementPerTurn = (trackWidth+trackGap);
 		double radiusIncrementPerSegment = radiusIncrementPerTurn/(segmentsPerLoop);
 
+		// we use x1,y1,x2,y2 as variables for the begining and end coords of line segments
 		double x1 = 0;
 		double y1 = 0;
 		double x2 = 0;
 		double y2 = 0;
+                // we use x1scales,y1scaled,x2scaled,y2scaled as variables for
+		// the begining and end coords of scaled helical coil segments
+		// for capaictance length calculation
+                double x1scaled = 0;
+                double y1scaled = 0;
+                double x2scaled = 0;
+                double y2scaled = 0;
+
+
+
+
 		long layerNumber = 15; // front
 
 		String moduleName = "";
@@ -152,6 +174,12 @@ public class SpiralInductorFootprintGenerator
 		{
 			outputFileName = moduleName + ".mod";
 		}
+
+		System.out.println("Generating " + turnsTotal + " turn inductor:" +
+			outputFileName);
+
+		System.out.println("Using track gap of: " + trackGap + " microns.");
+		System.out.println("Using track width of: " + trackWidth + " microns.");
 
 		File outputFile = new File(outputFileName);
 
@@ -191,6 +219,17 @@ public class SpiralInductorFootprintGenerator
                 long currentLoopStartY = 0;
 
                 double trackWidthMM = trackWidth/1000.0;
+		double trackGapMM = trackGap/1000.0;
+
+
+		// the following variables are used to calculate inductance
+		// using the "Greenhouse" equation for flat "pancake" inductors
+		// we set the default values to those needed for a helical coil
+		double cumulativeCapacitorLengthMM = 0.0;
+		double greenhouseC1 = 1.00; // Square 1.27, Hexagonal 1.09, Circle 1.00
+		double greenhouseC2 = 2.46; // Square 2.07, Hexagonal 2.23, Circle 2.46
+		double greenhouseC3 = 0.00; // Square 0.18, Hexagonal 0.00, Circle 0.00
+		double greenhouseC4 = 0.20; // Square 0.13, Hexagonal 0.17, Circle 0.20
 
 		for (long spiralCounter = 0; spiralCounter < turnsTotal; spiralCounter++)
 		{
@@ -210,6 +249,13 @@ public class SpiralInductorFootprintGenerator
                                 y1 = ((currentLoopStartY)/1000.0);
                                 x2 = (currentLoopStartX/1000.0);
                                 y2 = ((currentLoopStartY - squareSideLength)/1000.0);
+
+                                if (spiralCounter < (turnsTotal - 1))
+                                {
+                                        cumulativeCapacitorLengthMM += 
+                                                calculateSegmentLength(x1, y1, x2, y2)
+                                                + trackWidthMM + trackGapMM;
+                                }
 
                                 // for gEDA we have to produce a pad description of the form
                                 // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
@@ -239,6 +285,13 @@ public class SpiralInductorFootprintGenerator
                                 x2 = ((currentLoopStartX - squareSideLength)/1000.0);
                                 y2 = ((currentLoopStartY - squareSideLength)/1000.0);
 
+                                if (spiralCounter < (turnsTotal - 1))
+                                {
+                                        cumulativeCapacitorLengthMM += 
+                                                calculateSegmentLength(x1, y1, x2, y2)
+                                                + trackWidthMM + trackGapMM;
+                                }
+
                                 // for gEDA we have to produce a pad description of the form
                                 // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
                                 if (theOneTrueEDAsuiteGEDA)
@@ -267,6 +320,13 @@ public class SpiralInductorFootprintGenerator
                                 x2 = ((currentLoopStartX - squareSideLength)/1000.0);
                                 y2 = ((currentLoopStartY + radiusIncrementPerTurn)/1000.0);
 
+                                if (spiralCounter < (turnsTotal - 1))
+                                {
+                                        cumulativeCapacitorLengthMM += 
+                                                calculateSegmentLength(x1, y1, x2, y2)
+                                                + trackWidthMM + trackGapMM;
+                                }
+
                                 // for gEDA we have to produce a pad description of the form
                                 // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
                                 if (theOneTrueEDAsuiteGEDA)
@@ -294,6 +354,13 @@ public class SpiralInductorFootprintGenerator
                                 y1 = ((currentLoopStartY + radiusIncrementPerTurn)/1000.0);
                                 x2 = ((currentLoopStartX + radiusIncrementPerTurn)/1000.0);
                                 y2 = ((currentLoopStartY + radiusIncrementPerTurn)/1000.0);
+
+                                if (spiralCounter < (turnsTotal - 1))
+                                {
+                                        cumulativeCapacitorLengthMM += 
+                                                calculateSegmentLength(x1, y1, x2, y2)
+                                                + trackWidthMM + trackGapMM;
+                                }
 
                                 // for gEDA we have to produce a pad description of the form
                                 // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
@@ -331,6 +398,23 @@ public class SpiralInductorFootprintGenerator
 					y1 = ((startRadius * Math.sin(theta))/1000.0);
 	      	                        x2 = ((nextRadius * Math.cos(nextTheta))/1000.0);
 	                                y2 = ((nextRadius * Math.sin(nextTheta))/1000.0);
+
+
+					// we numerically integrate the length of the midline
+					// between turns, hence the use of the + (trackGap/2.0)
+					// to estabish the midline of the gap
+                                        x1scaled = ((startRadius + (trackGap/2.0))* Math.cos(theta))/1000.0;
+                                        y1scaled = ((startRadius + (trackGap/2.0))* Math.sin(theta))/1000.0;
+                                        x2scaled = ((nextRadius + (trackGap/2.0))* Math.cos(nextTheta))/1000.0;
+                                        y2scaled = ((nextRadius + (trackGap/2.0))* Math.sin(nextTheta))/1000.0;
+
+
+	                                if (spiralCounter < (turnsTotal - 1))
+        	                        {
+                	                        cumulativeCapacitorLengthMM +=
+                        	     calculateSegmentLength(x1scaled, y1scaled, x2scaled, y2scaled);
+                                	}
+
 
 					// for gEDA we have to produce a pad description of the form
 					// Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
@@ -375,8 +459,99 @@ public class SpiralInductorFootprintGenerator
                 	footprintOutput.println("$EndMODULE " + moduleName);
 		}
 
+		System.out.println("Outer diameter of coil (mm): " + (outerDiameter)/1000.0);
+		System.out.println("Inner diameter of coil (mm): " + (innerDiameter)/1000.0);
+
+ 		System.out.print("Total capacitor length (mm): ");
+		System.out.format("%.4f\n", cumulativeCapacitorLengthMM);
+
+		double finalCapacitanceF = calculateCapacitance(trackGapMM,cumulativeCapacitorLengthMM);
+		
+		System.out.println("Total calculated capacitance (F): " + finalCapacitanceF);
+                System.out.print("Total calculated capacitance (pF): ");
+		System.out.format("%.4f\n", (finalCapacitanceF*1E12));
+
+		if (squareCoil)
+		{
+                	greenhouseC1 = 1.27; // Square 1.27, Hexagonal 1.09, Circle 1.00
+                	greenhouseC2 = 2.07; // Square 2.07, Hexagonal 2.23, Circle 2.46
+                	greenhouseC3 = 0.18; // Square 0.18, Hexagonal 0.00, Circle 0.00
+                	greenhouseC4 = 0.13; // Square 0.13, Hexagonal 0.17, Circle 0.20
+		}
+		if (hexagonalCoil)
+		{
+                	greenhouseC1 = 1.09; // Square 1.27, Hexagonal 1.09, Circle 1.00
+                	greenhouseC2 = 2.23; // Square 2.07, Hexagonal 2.23, Circle 2.46
+                	greenhouseC3 = 0.00; // Square 0.18, Hexagonal 0.00, Circle 0.00
+                	greenhouseC4 = 0.17; // Square 0.13, Hexagonal 0.17, Circle 0.20
+		}
+
+		double finalInductanceH = calculateInductance(turnsTotal, innerDiameter, outerDiameter, greenhouseC1, greenhouseC2, greenhouseC3, greenhouseC4);
+		
+ 		System.out.println("Calculated inductance (Henries): " + finalInductanceH);
+                System.out.print("Calculated inductance (uH): ");
+                System.out.format("%.4f\n", (finalInductanceH*1000000));
+		System.out.print("Calculated self resonant frequency (Hz): ");
+		System.out.format("%.0f\n", calculateSelfResonance(finalInductanceH, finalCapacitanceF));
+                System.out.print("Calculated self resonant frequency (MHz): ");
+		System.out.format("%.4f\n", calculateSelfResonance(finalInductanceH, finalCapacitanceF)/1E6);
 		// and we close the footprint file before finishing up
 		footprintOutput.close();
+	}
+
+	private static double calculateSelfResonance(double inductanceHenries, double capacitance)
+	{
+                // method employed described in http://dx.doi.org/10.4236/cs.2013.42032
+                // "Design and Optimization of Printed Circuit Board
+                // Inductors for Wireless Power Transfer System" by
+                // Ashraf B. Islam, Syed K. Islam, Fahmida S. Tulip
+                // Circuits and Systems, 2013, 4, 237-244
+
+		// we use frequency = 1/(2*pi*sqrt(LC)) 
+		return (1.0/(2.0*Math.PI*Math.sqrt(inductanceHenries*capacitance)));
+	}
+
+	private static double calculateSegmentLength(double xOne, double yOne, double xTwo, double yTwo)
+	{
+		double lengthSquared = ((xOne - xTwo) * (xOne - xTwo))+((yOne - yTwo) * (yOne - yTwo));
+		return Math.sqrt(lengthSquared);
+	}
+
+	private static double calculateCapacitance(double trackGapMilliM, double gapLengthMilliM)
+	{
+                // method employed described in http://dx.doi.org/10.4236/cs.2013.42032
+                // "Design and Optimization of Printed Circuit Board
+                // Inductors for Wireless Power Transfer System" by
+                // Ashraf B. Islam, Syed K. Islam, Fahmida S. Tulip
+                // Circuits and Systems, 2013, 4, 237-244
+		double etaRC = 3.1; // solder mask relative permittivity a.k.a. dielectric constant
+		double etaRS = 4.7; // approx, fibreglass relative permittivity (dielectric constant)
+				// etaRA = 1.006 for air at STP at ~ 0.9MHz
+		double alpha = 0.9; // for FR4 coating
+		double beta = 0.1; // for FR4 substrate	
+		double eta0 = 8.854E-12; // dielectric constant of a vacuum	
+		double copperThicknessM = 0.00003556; // in metres = 35.56 microns for 1oz/ft^2 copper
+		double trackGapM = trackGapMilliM/1000.0; // convert mm to metres
+		double gapLengthM = gapLengthMilliM/1000.0; // convert mm to metres
+		double calculatedCapacitance = (alpha*etaRC + beta*etaRS)*eta0*copperThicknessM*gapLengthM/trackGapM;
+		// i.e. the formula for parallel plates of a capacitor
+		//            = (plateArea/gap)*dielectricConstantOfVacuum*relativePermittivity
+		return calculatedCapacitance;
+	}
+
+	private static double calculateInductance(int turns, long dIn, long dOut, double c1, double c2, double c3, double c4)
+	{
+		// method employed described in http://dx.doi.org/10.4236/cs.2013.42032
+		// "Design and Optimization of Printed Circuit Board
+		// Inductors for Wireless Power Transfer System" by
+		// Ashraf B. Islam, Syed K. Islam, Fahmida S. Tulip
+		// Circuits and Systems, 2013, 4, 237-244
+		double dAvg = ((dOut + dIn)/1000000.0)/2.0; // convert distance in microns to metres
+		double sigma = (dOut - dIn)/(1.0*(dOut + dIn)); // sigma = "coil fill ratio"
+		double mu = 4*Math.PI/10000000; // vacuum permeability = 4*pi * 10^(-7)
+		double inductance = 0;
+		inductance = ((mu * turns * turns * dAvg * c1)/2.0)*(Math.log(c2/sigma) + c3*sigma + c4*sigma*sigma);
+		return inductance; // in Henries (H)
 	}
 
 	private static void printUsage()
@@ -385,11 +560,11 @@ public class SpiralInductorFootprintGenerator
 			"java SpiralInductorFootprintGenerator -option value\n" +
 			"\n\t\t-k\texport a kicad module, default is geda .fp file\n" +
                         "\n\t\t-s\texport a square inductor, default is circular\n" +
-                        "\n\t\t-i long\t inner diameter of coil in nanometres\n" +
-                        "\n\t\t-o long\t outer diameter of coil in nanometres\n" +
-                        "\n\t\t-w long\t track width in nanometres\n" +
+                        "\n\t\t-i long\t inner diameter of coil in microns\n" +
+                        "\n\t\t-o long\t outer diameter of coil in microns\n" +
+                        "\n\t\t-w long\t track width in microns\n" +
                         "\n\t\t-n long\t number of turns\n" +
-			"\n\t\t-l long\t length of segment used to approximate circular arc in nanometres\n" +
+			"\n\t\t-l long\t length of segment used to approximate circular arc in microns\n" +
 			"\n\t\t-h\t prints this\n\n" +
 			"Example usage:\n\n\t" +
 			"java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -l 3000\n\n\t" +
