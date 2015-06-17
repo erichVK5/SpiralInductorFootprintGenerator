@@ -7,6 +7,7 @@ Users can then add suitable pins or tracks with a footprint editor or text edito
 
 Users will typically have a required inductance in mind, for which a certain number of turns, line spacing, track width, copper thickness and PCB material will provide the necessary inductance.
 
+The utility now calculates inductance for the inductor, as well as its self resonant frequency, assuming an FR4 substrate and 35 micron (1 oz / ft^2) copper.
 
 Building:
 
