@@ -26,9 +26,9 @@ Usage:
 
 		-k	export a kicad module, default is geda .fp file
 
-                -vN	export an N-gonal inductor instead of default helical inductor
+		-vN	export an N-gonal inductor instead of default helical inductor
 
-                        i.e. -v3 for triangle, -v4 for square, -v6 for hexagon
+			i.e. -v3 for triangle, -v4 for square, -v6 for hexagon
 
 		-i long	 inner diameter of coil in microns
 
@@ -51,11 +51,11 @@ Example usage:
 	with 0.25mm track width and 3mm segment length.
 
 
-        java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -v5
+	java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -v5
 
-        generates a 40 turn pentagonal inductor footprint,
-        of 15mm inside diameter, 50 mm outside diameter,
-        with 0.25mm track width.
+	generates a 40 turn pentagonal inductor footprint,
+	of 15mm inside diameter, 50 mm outside diameter,
+	with 0.25mm track width.
 
 
 
