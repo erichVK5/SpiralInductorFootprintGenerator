@@ -15,7 +15,7 @@
 //    GNU General Public License for more details.
 //    
 //    You should have received a copy of the GNU General Public License
-//    along with this program; if not, write to the Free Software
+//    along with this program if not, write to the Free Software
 //    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //    
 //    SpiralInductorFootprintGenerator.java Copyright (C) 2015 Erich S. Heinzle a1039181@gmail.com
@@ -44,8 +44,7 @@ public class SpiralInductorFootprintGenerator
                 boolean theOneTrueEDAsuiteGEDA = true;
                 	// obviously, !theOneTrueEDAsuiteGEDA = kicad :-)
 
-		boolean squareCoil = false;
-		boolean hexagonalCoil = false;
+		int vertices = 0;
 
 		// we now parse arguments parsed via the command line
 
@@ -86,9 +85,14 @@ public class SpiralInductorFootprintGenerator
                         {
                                 theOneTrueEDAsuiteGEDA = false;
                         }
-			else if (args[counter].startsWith("-s"))
+			else if (args[counter].startsWith("-v"))
 			{
-				squareCoil = true;
+				vertices = Integer.parseInt(args[counter].substring(2));
+				if ((vertices == 1) || (vertices == 2))
+				{
+					System.out.println("Assuming inductor is helical.");
+					vertices = 0;
+				}
 			}
                         else 
                         {
@@ -98,13 +102,17 @@ public class SpiralInductorFootprintGenerator
 			
 		}
 
-		// we now sort out appropriate angular step sizes for the loops and
-		// the loop spacings based on the inner and outer dimensions given
+		// some basic preliminaries for all scenarios
 
-		double theta = 0;
-		double nextTheta = 0;
-		double startRadius = innerDiameter/2.0;
+                double startRadius = (innerDiameter + trackWidth)/2.0;
 		double nextRadius = startRadius;
+
+		// now some preliminaries for heliical inductors
+                // we now sort out appropriate angular step sizes for the loops and
+                // the loop spacings based on the inner and outer dimensions given
+
+                double theta = 0;
+                double nextTheta = 0;
 
 		// we figure out the circumference, well, at least a reasonable
 		// approximation of a real number using the set of long integers
@@ -116,10 +124,10 @@ public class SpiralInductorFootprintGenerator
                 // which is 2pi radians divided by number of segments
 		double deltaTheta = (2.0 * Math.PI)/segmentsPerLoop;
 
-//		System.out.println("deltaTheta :" + deltaTheta);
-
 		// we now define some flags
 		boolean nextTurnPlease = false;
+
+                // none of the above prelimiaries are needed for n-gons
 
 		long trackGap = 0; // in microns
 
@@ -129,7 +137,7 @@ public class SpiralInductorFootprintGenerator
 		}
 		else // stops a divide by zero error if only one loop requested
 		{
-			trackGap = (long)startRadius;
+			trackGap = (long)(innerDiameter/2.0); // i.e. startRadius
 		}
 
 		double radiusIncrementPerTurn = (trackWidth+trackGap);
@@ -141,27 +149,39 @@ public class SpiralInductorFootprintGenerator
 		double x2 = 0;
 		double y2 = 0;
                 // we use x1scales,y1scaled,x2scaled,y2scaled as variables for
-		// the begining and end coords of scaled helical coil segments
-		// for capaictance length calculation
+		// the beginning and end coords of scaled helical coil segments
+		// for capacitance length calculation
                 double x1scaled = 0;
                 double y1scaled = 0;
                 double x2scaled = 0;
                 double y2scaled = 0;
 
-
-
-
-		long layerNumber = 15; // front
+		long layerNumber = 15; // front for kicad
 
 		String moduleName = "";
 
-		if (squareCoil)
+		switch (vertices) // vertices=1 and vertices=2 were screened out during args parsing
 		{
-                        moduleName = turnsTotal + "_turn_square_spiral";
-		}
-		else
-		{
-			moduleName = turnsTotal + "_turn_spiral";
+			case 0:	moduleName = turnsTotal + "_turn_helical_inductor";
+				break;
+			case 3: moduleName = turnsTotal + "_turn_triangular_inductor";
+                                break;
+			case 4: moduleName = turnsTotal + "_turn_square_inductor";
+				break;
+			case 5:	moduleName = turnsTotal + "_turn_pentagonal_inductor";
+                                break;
+			case 6: moduleName = turnsTotal + "_turn_hexagonal_inductor";
+                                break;
+			case 7: moduleName = turnsTotal + "_turn_heptagonal_inductor";
+                                break;
+                        case 8: moduleName = turnsTotal + "_turn_octagonal_inductor";
+                                break;
+                        case 9: moduleName = turnsTotal + "_turn_nonagonal_inductor";
+                                break;
+                        case 10: moduleName = turnsTotal + "_turn_decagonal_inductor";
+                                break;
+			default: moduleName = turnsTotal + "_turn_" + vertices + "_gon_inductor";
+				break;
 		}
 
 		String outputFileName = "";
@@ -210,7 +230,6 @@ public class SpiralInductorFootprintGenerator
                                 "AR\n" +
                                 "Op 0 0 0\n" +
                                 "T0 0 -4134 600 600 0 120 N V 21 N \"S***\"\n";
-//	                System.out.print(headerString);
 		}
 
 		footprintOutput.print(headerString);
@@ -221,173 +240,120 @@ public class SpiralInductorFootprintGenerator
                 double trackWidthMM = trackWidth/1000.0;
 		double trackGapMM = trackGap/1000.0;
 
-
-		// the following variables are used to calculate inductance
-		// using the "Greenhouse" equation for flat "pancake" inductors
-		// we set the default values to those needed for a helical coil
-		double cumulativeCapacitorLengthMM = 0.0;
-		double greenhouseC1 = 1.00; // Square 1.27, Hexagonal 1.09, Circle 1.00
-		double greenhouseC2 = 2.46; // Square 2.07, Hexagonal 2.23, Circle 2.46
-		double greenhouseC3 = 0.00; // Square 0.18, Hexagonal 0.00, Circle 0.00
-		double greenhouseC4 = 0.20; // Square 0.13, Hexagonal 0.17, Circle 0.20
+		// we need to calculate the effective length of the distributed capacitor
+                double cumulativeCapacitorLengthMM = 0.0;
 
 		for (long spiralCounter = 0; spiralCounter < turnsTotal; spiralCounter++)
 		{
-			// 1mm segment lengths seem about right, but now user configurable
-			// base it on outer loop
-			// circumference = Math.pi * outerDiameter
 
-			if (squareCoil)
+			if (vertices != 0) // we are making an n-gon, as opposed to a helical coil
 			{
-				currentLoopStartX = (long)(radiusIncrementPerTurn * spiralCounter);
-				currentLoopStartY = (long)(radiusIncrementPerTurn * spiralCounter);
-				// i.e. we step rightwards and down an increment for each new turn
-				long squareSideLength = (long)((startRadius * 2) + (spiralCounter * 2.0 * radiusIncrementPerTurn));
-
-				// we start the first side of the square, going up i.e. -ve Y direction
-                                x1 = ((currentLoopStartX)/1000.0);
-                                y1 = ((currentLoopStartY)/1000.0);
-                                x2 = (currentLoopStartX/1000.0);
-                                y2 = ((currentLoopStartY - squareSideLength)/1000.0);
-
-                                if (spiralCounter < (turnsTotal - 1))
+				// the following if then else structure figures out a starting theta
+				// for the n-gon in an attempt to give an aesthetically pleasing coil
+				if ((vertices % 2) == 1)
+				{
+					theta = (Math.PI/(2 * vertices));
+				}
+                                else if ((vertices % 2) == 0) 
                                 {
-                                        cumulativeCapacitorLengthMM += 
-                                                calculateSegmentLength(x1, y1, x2, y2)
-                                                + trackWidthMM + trackGapMM;
+                                        theta = (Math.PI/(vertices));
                                 }
+				else
+				{
+					theta = 0.0;
+				}
 
-                                // for gEDA we have to produce a pad description of the form
-                                // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
-                                if (theOneTrueEDAsuiteGEDA)
-                                {
-                                        footprintOutput.format("Pad[%.3fmm %.3fmm %.3fmm %.3fmm", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3fmm ", trackWidthMM);
-                                        footprintOutput.print("0.254mm "); // the clearance is 10mil
-                                        footprintOutput.print("0 "); // solder mask clearance is zero
-                                        footprintOutput.print("\"A\" "); // name of coil
-                                        footprintOutput.print("\"1\" "); // coil pad number
-                                        footprintOutput.print("\"\"]\n"); // name of coil
-                                }
-                                else // kicad
-                                {
-                                // for kicad we have to produce
-                                // a Draw Segment "DS" string of the form
-                                // "DS x1 y1 x2 y2 thickness layer"
-                                        footprintOutput.format("DS %.3f %.3f %.3f %.3f", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3f ", trackWidthMM);
-                                        footprintOutput.println(layerNumber);
-                                }
+				// we figure out the radius at a vertex using some trigonometry
+				nextRadius = startRadius/Math.cos(Math.PI/vertices) + (spiralCounter * (radiusIncrementPerTurn/Math.cos(Math.PI/vertices)));
 
-				// we start the second side of the square, going left i.e. -ve X direction
-                                x1 = (currentLoopStartX/1000.0);
-                                y1 = ((currentLoopStartY - squareSideLength)/1000.0);
-                                x2 = ((currentLoopStartX - squareSideLength)/1000.0);
-                                y2 = ((currentLoopStartY - squareSideLength)/1000.0);
+				// we step through, one vertex after another, until we complete a turn
+				for (int vertexCount = 0; vertexCount < vertices; vertexCount++)
+				{
+					if (vertexCount < (vertices -2))
+					{
+	                        	        x1 = (nextRadius * Math.cos(vertexCount * 2 * Math.PI/vertices + theta))/1000.0;
+	                        	        y1 = (nextRadius * Math.sin(vertexCount * 2 * Math.PI/vertices + theta))/1000.0;
+	                        	        x2 = ((nextRadius * Math.cos((vertexCount + 1) * 2 * Math.PI/vertices + theta))/1000.0);
+	                        	        y2 = ((nextRadius * Math.sin((vertexCount + 1) * 2 * Math.PI/vertices + theta))/1000.0);
+					}
+					else if (vertexCount == (vertices-2))
+                                        {
+                                                x1 = (nextRadius * Math.cos(vertexCount * 2 * Math.PI/vertices + theta))/1000.0;
+                                                y1 = (nextRadius * Math.sin(vertexCount * 2 * Math.PI/vertices + theta))/1000.0;
+                                                x2 = ((nextRadius * Math.cos((vertexCount + 1) * 2 * Math.PI/vertices + theta))/1000.0);
+                                                y2 = ((nextRadius * Math.sin((vertexCount + 1) * 2 * Math.PI/vertices + theta))/1000.0);
+                                                // the second to last line segment making up the n-gon
+                                                // need to be lengthened to allow the final segment of
+                                                // of the current turn to finish where the next turn
+                                                // starts
+						// the segment is lengthened by an amount equal to 
+						// = radiusIncrementPerTurn/cos(90-360/vertices)
+						// = radiusIncrementPerTurn/ sin(360/vertices)
+						// and the deltaX and deltaY components of the
+						// segment are lengthened proportionally
 
-                                if (spiralCounter < (turnsTotal - 1))
-                                {
-                                        cumulativeCapacitorLengthMM += 
-                                                calculateSegmentLength(x1, y1, x2, y2)
-                                                + trackWidthMM + trackGapMM;
-                                }
+						x2 = x1 + ((x2 - x1) * (calculateSegmentLength(x1, y1, x2, y2) + (radiusIncrementPerTurn/(Math.sin(2.0 * Math.PI/vertices) * 1000)) )/calculateSegmentLength(x1, y1, x2, y2));
+                                                y2 = y1 + ((y2 - y1) * (calculateSegmentLength(x1, y1, x2, y2) + (radiusIncrementPerTurn/(Math.sin(2.0 * Math.PI/vertices) * 1000)) )/calculateSegmentLength(x1, y1, x2, y2));
+						// we just scaled x2, y2 to match the next turn
+                                        }
+                                        else // last segment of current loop
+                                        {
+						// for the final segment of the current turn, we
+						// increment the radius to match the next turn
+                                                nextRadius = startRadius/Math.cos(Math.PI/vertices)
+                                                        + ((spiralCounter + 1) * (radiusIncrementPerTurn/Math.cos(Math.PI/vertices)));
+						// we can start where we left off with the last
+						// line segment
+                                                x1 = x2; // copy the previous coords
+                                                y1 = y2; // copy the previous coords
+						// and we finish the segment using the new radius
+						// that was incremented to match the next turn
+                                                x2 = ((nextRadius * Math.cos((vertexCount + 1) * 2 * Math.PI/vertices + theta))/1000.0);
+                                                y2 = ((nextRadius * Math.sin((vertexCount + 1) * 2 * Math.PI/vertices + theta))/1000.0);
+                                        }
 
-                                // for gEDA we have to produce a pad description of the form
-                                // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
-                                if (theOneTrueEDAsuiteGEDA)
-                                {
-                                        footprintOutput.format("Pad[%.3fmm %.3fmm %.3fmm %.3fmm", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3fmm ", trackWidthMM);
-                                        footprintOutput.print("0.254mm "); // the clearance is 10mil
-                                        footprintOutput.print("0 "); // solder mask clearance is zero
-                                        footprintOutput.print("\"A\" "); // name of coil
-                                        footprintOutput.print("\"1\" "); // coil pad number
-                                        footprintOutput.print("\"\"]\n"); // name of coil
-                                }
-                                else // kicad
-                                {
-                                // for kicad we have to produce
-                                // a Draw Segment "DS" string of the form
-                                // "DS x1 y1 x2 y2 thickness layer"
-                                        footprintOutput.format("DS %.3f %.3f %.3f %.3f", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3f ", trackWidthMM);
-                                        footprintOutput.println(layerNumber);
-                                }
+					// we only have capacitance between turns, so we stop
+					// summing capacitance length when generating the
+					// final turn, i.e. stop at (turnsTotal - 1)
 
-				// we start the third side of the square, going down i.e. +ve Y direction
-                                x1 = ((currentLoopStartX - squareSideLength)/1000.0);
-                                y1 = ((currentLoopStartY - squareSideLength)/1000.0);
-                                x2 = ((currentLoopStartX - squareSideLength)/1000.0);
-                                y2 = ((currentLoopStartY + radiusIncrementPerTurn)/1000.0);
+	                                if (spiralCounter < (turnsTotal - 1))
+	                                {
+	                                        cumulativeCapacitorLengthMM +=
+	                                                calculateSegmentLength(x1, y1, x2, y2)
+	                                                + (radiusIncrementPerTurn * Math.tan(Math.PI/vertices));
+	                                }
 
-                                if (spiralCounter < (turnsTotal - 1))
-                                {
-                                        cumulativeCapacitorLengthMM += 
-                                                calculateSegmentLength(x1, y1, x2, y2)
-                                                + trackWidthMM + trackGapMM;
-                                }
+	                                // for gEDA we have to produce a pad description of the form
+	                                // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
 
-                                // for gEDA we have to produce a pad description of the form
-                                // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
-                                if (theOneTrueEDAsuiteGEDA)
-                                {
-                                        footprintOutput.format("Pad[%.3fmm %.3fmm %.3fmm %.3fmm", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3fmm ", trackWidthMM);
-                                        footprintOutput.print("0.254mm "); // the clearance is 10mil
-                                        footprintOutput.print("0 "); // solder mask clearance is zero
-                                        footprintOutput.print("\"A\" "); // name of coil
-                                        footprintOutput.print("\"1\" "); // coil pad number
-                                        footprintOutput.print("\"\"]\n"); // name of coil
-                                }
-                                else // kicad
-                                {
-                                // for kicad we have to produce
-                                // a Draw Segment "DS" string of the form
-                                // "DS x1 y1 x2 y2 thickness layer"
-                                        footprintOutput.format("DS %.3f %.3f %.3f %.3f", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3f ", trackWidthMM);
-                                        footprintOutput.println(layerNumber);
-                                }
+					if (theOneTrueEDAsuiteGEDA)
+	                                {
+	                                        footprintOutput.format("Pad[%.3fmm %.3fmm %.3fmm %.3fmm", x1, y1, x2, y2);
+	                                        footprintOutput.format(" %.3fmm ", trackWidthMM);
+	                                        footprintOutput.print("0.254mm "); // the clearance is 10mil
+	                                        footprintOutput.print("0 "); // solder mask clearance is zero
+	                                        footprintOutput.print("\"A\" "); // name of coil
+	                                        footprintOutput.print("\"1\" "); // coil pad number
+	                                        footprintOutput.print("\"\"]\n"); // name of coil
+	                                }
+	                                else // kicad
+	                                {
 
-				// we start the fourth side of the square, going right i.e. +ve X direction
-                                x1 = ((currentLoopStartX - squareSideLength)/1000.0);
-                                y1 = ((currentLoopStartY + radiusIncrementPerTurn)/1000.0);
-                                x2 = ((currentLoopStartX + radiusIncrementPerTurn)/1000.0);
-                                y2 = ((currentLoopStartY + radiusIncrementPerTurn)/1000.0);
+		                                // for kicad we have to produce
+		                                // a Draw Segment "DS" string of the form
+	        	                        // "DS x1 y1 x2 y2 thickness layer"
 
-                                if (spiralCounter < (turnsTotal - 1))
-                                {
-                                        cumulativeCapacitorLengthMM += 
-                                                calculateSegmentLength(x1, y1, x2, y2)
-                                                + trackWidthMM + trackGapMM;
-                                }
-
-                                // for gEDA we have to produce a pad description of the form
-                                // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
-                                if (theOneTrueEDAsuiteGEDA)
-                                {
-                                        footprintOutput.format("Pad[%.3fmm %.3fmm %.3fmm %.3fmm", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3fmm ", trackWidthMM);
-                                        footprintOutput.print("0.254mm "); // the clearance is 10mil
-                                        footprintOutput.print("0 "); // solder mask clearance is zero
-                                        footprintOutput.print("\"A\" "); // name of coil
-                                        footprintOutput.print("\"1\" "); // coil pad number
-                                        footprintOutput.print("\"\"]\n"); // name of coil
-                                }
-                                else // kicad
-                                {
-                                // for kicad we have to produce
-                                // a Draw Segment "DS" string of the form
-                                // "DS x1 y1 x2 y2 thickness layer"
-                                        footprintOutput.format("DS %.3f %.3f %.3f %.3f", x1, y1, x2, y2);
-                                        footprintOutput.format(" %.3f ", trackWidthMM);
-                                        footprintOutput.println(layerNumber);
-                                }
+	                                        footprintOutput.format("DS %.3f %.3f %.3f %.3f", x1, y1, x2, y2);
+	                                        footprintOutput.format(" %.3f ", trackWidthMM);
+	                                        footprintOutput.println(layerNumber);
+	                                }
 
 
-			}
-			else
-			{ // start non square i.e. helical coil section
+				}
+			} // end n-gon IF statement 
+
+			else if (vertices == 0) // not an n-gon, it is a helical coil
+			{
 				while (!nextTurnPlease)
 				{
 					nextTheta = theta + deltaTheta;	
@@ -399,15 +365,18 @@ public class SpiralInductorFootprintGenerator
 	      	                        x2 = ((nextRadius * Math.cos(nextTheta))/1000.0);
 	                                y2 = ((nextRadius * Math.sin(nextTheta))/1000.0);
 
-
 					// we numerically integrate the length of the midline
 					// between turns, hence the use of the + (trackGap/2.0)
 					// to estabish the midline of the gap
+
                                         x1scaled = ((startRadius + (trackGap/2.0))* Math.cos(theta))/1000.0;
                                         y1scaled = ((startRadius + (trackGap/2.0))* Math.sin(theta))/1000.0;
                                         x2scaled = ((nextRadius + (trackGap/2.0))* Math.cos(nextTheta))/1000.0;
                                         y2scaled = ((nextRadius + (trackGap/2.0))* Math.sin(nextTheta))/1000.0;
 
+
+					// there is only capacitance between turns, so we stop summing
+					// capacitor length at (turnsTotal -1)
 
 	                                if (spiralCounter < (turnsTotal - 1))
         	                        {
@@ -415,9 +384,9 @@ public class SpiralInductorFootprintGenerator
                         	     calculateSegmentLength(x1scaled, y1scaled, x2scaled, y2scaled);
                                 	}
 
-
 					// for gEDA we have to produce a pad description of the form
 					// Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
+
 					if (theOneTrueEDAsuiteGEDA)
 					{
 						footprintOutput.format("Pad[%.3fmm %.3fmm %.3fmm %.3fmm", x1, y1, x2, y2);
@@ -430,9 +399,9 @@ public class SpiralInductorFootprintGenerator
 					}
 					else // kicad
 					{
-					// for kicad we have to produce
-					// a Draw Segment "DS" string of the form
-					// "DS x1 y1 x2 y2 thickness layer"
+						// for kicad we have to produce
+						// a Draw Segment "DS" string of the form
+						// "DS x1 y1 x2 y2 thickness layer"
 						footprintOutput.format("DS %.3f %.3f %.3f %.3f", x1, y1, x2, y2);
 						footprintOutput.format(" %.3f ", trackWidthMM);
 						footprintOutput.println(layerNumber);
@@ -441,13 +410,12 @@ public class SpiralInductorFootprintGenerator
 					theta = nextTheta;
 					if (theta > (2*Math.PI))
 					{
-//						System.out.println("Next Loop");
 						theta = theta - (2.0*Math.PI);
 						nextTurnPlease = true;
 					}
 				}
 				nextTurnPlease = false;
-			}// end non square coil if statement
+			}// end helical coil IF statement
 		}
 
 		if (theOneTrueEDAsuiteGEDA) // :-)
@@ -461,6 +429,14 @@ public class SpiralInductorFootprintGenerator
 
 		System.out.println("Outer diameter of coil (mm): " + (outerDiameter)/1000.0);
 		System.out.println("Inner diameter of coil (mm): " + (innerDiameter)/1000.0);
+		if (vertices != 0)
+		{
+			System.out.println("Inductor has " + vertices + " vertices.");
+		}
+		else
+		{
+			System.out.println("Inductor is helical");
+		}
 
  		System.out.print("Total capacitor length (mm): ");
 		System.out.format("%.4f\n", cumulativeCapacitorLengthMM);
@@ -471,20 +447,42 @@ public class SpiralInductorFootprintGenerator
                 System.out.print("Total calculated capacitance (pF): ");
 		System.out.format("%.4f\n", (finalCapacitanceF*1E12));
 
-		if (squareCoil)
+                // the following variables are used to calculate inductance
+                // using the "Greenhouse" equation for flat "pancake" inductors
+                // we set the default values to those needed for a helical coil
+                double greenhouseC1 = 1.00; // Square 1.27, Hexagonal 1.09, Circle 1.00
+                double greenhouseC2 = 2.46; // Square 2.07, Hexagonal 2.23, Circle 2.46
+                double greenhouseC3 = 0.00; // Square 0.18, Hexagonal 0.00, Circle 0.00
+                double greenhouseC4 = 0.20; // Square 0.13, Hexagonal 0.17, Circle 0.20
+
+		if (vertices == 4)
 		{
                 	greenhouseC1 = 1.27; // Square 1.27, Hexagonal 1.09, Circle 1.00
                 	greenhouseC2 = 2.07; // Square 2.07, Hexagonal 2.23, Circle 2.46
                 	greenhouseC3 = 0.18; // Square 0.18, Hexagonal 0.00, Circle 0.00
                 	greenhouseC4 = 0.13; // Square 0.13, Hexagonal 0.17, Circle 0.20
 		}
-		if (hexagonalCoil)
+		else if (vertices == 6)
 		{
                 	greenhouseC1 = 1.09; // Square 1.27, Hexagonal 1.09, Circle 1.00
                 	greenhouseC2 = 2.23; // Square 2.07, Hexagonal 2.23, Circle 2.46
                 	greenhouseC3 = 0.00; // Square 0.18, Hexagonal 0.00, Circle 0.00
                 	greenhouseC4 = 0.17; // Square 0.13, Hexagonal 0.17, Circle 0.20
 		}
+		else if (vertices == 8)
+                {
+                        greenhouseC1 = 1.07; // Square 1.27, Hexagonal 1.09, Circle 1.00
+                        greenhouseC2 = 2.29; // Square 2.07, Hexagonal 2.23, Circle 2.46
+                        greenhouseC3 = 0.00; // Square 0.18, Hexagonal 0.00, Circle 0.00
+                        greenhouseC4 = 0.19; // Square 0.13, Hexagonal 0.17, Circle 0.20
+                }
+		else if (vertices != 0)
+		{
+			System.out.println("Using inductance equation for circle due to a" +
+					" lack of published parameters\nfor the inductance of " +
+					vertices + " vertex inductors.");
+		}
+
 
 		double finalInductanceH = calculateInductance(turnsTotal, innerDiameter, outerDiameter, greenhouseC1, greenhouseC2, greenhouseC3, greenhouseC4);
 		
@@ -559,7 +557,8 @@ public class SpiralInductorFootprintGenerator
 		System.out.println("\nUsage:\n\n\t" +
 			"java SpiralInductorFootprintGenerator -option value\n" +
 			"\n\t\t-k\texport a kicad module, default is geda .fp file\n" +
-                        "\n\t\t-s\texport a square inductor, default is circular\n" +
+                        "\n\t\t-vN\texport an N-gonal inductor instead of default helical inductor\n" +
+			"\n\t\t\ti.e. -v3 for triangle, -v4 for square, -v6 for hexagon\n" + 
                         "\n\t\t-i long\t inner diameter of coil in microns\n" +
                         "\n\t\t-o long\t outer diameter of coil in microns\n" +
                         "\n\t\t-w long\t track width in microns\n" +

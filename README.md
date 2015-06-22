@@ -1,13 +1,13 @@
 # SpiralInductorFootprintGenerator
-A java utility for generating helical or square inductor footprints in either gEDA footprint or Kicad legacy module format.
+A java utility for generating helical or polygonal inductor footprints in either gEDA footprint or Kicad legacy module format.
 
-The user can quickly and easily generate a square or helical PCB inductor of specified dimensions using command line options.
+The user can quickly and easily generate a helical or polygonal PCB inductor of specified dimensions using command line options.
 
 Users can then add suitable pins or tracks with a footprint editor or text editor to effect connections to adjacent components.
 
 Users will typically have a required inductance in mind, for which a certain number of turns, line spacing, track width, copper thickness and PCB material will provide the necessary inductance.
 
-The utility now calculates inductance for the inductor, as well as its self resonant frequency, assuming an FR4 substrate and 35 micron (1 oz / ft^2) copper.
+The utility now calculates distributed capacitance and inductance for the inductor, as well as the resulting self resonant frequency, assuming an FR4 substrate and 35 micron (1 oz / ft^2) copper.
 
 Building:
 
@@ -26,7 +26,9 @@ Usage:
 
 		-k	export a kicad module, default is geda .fp file
 
-		-s	export a square inductor, default is circular
+                -vN	export an N-gonal inductor instead of default helical inductor
+
+                        i.e. -v3 for triangle, -v4 for square, -v6 for hexagon
 
 		-i long	 inner diameter of coil in microns
 
@@ -47,6 +49,14 @@ Example usage:
 	generates a 40 turn helical inductor footprint,
 	of 15mm inside diameter, 50 mm outside diameter,
 	with 0.25mm track width and 3mm segment length.
+
+
+        java SpiralInductorFootprintGenerator -n 40 -i 15000 -o 50000 -w 250 -v5
+
+        generates a 40 turn pentagonal inductor footprint,
+        of 15mm inside diameter, 50 mm outside diameter,
+        with 0.25mm track width.
+
 
 
 SpiralInductorFootprintGenerator.java v1.0
