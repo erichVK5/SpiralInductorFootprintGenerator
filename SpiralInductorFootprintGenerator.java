@@ -243,6 +243,9 @@ public class SpiralInductorFootprintGenerator
 		// we need to calculate the effective length of the distributed capacitor
                 double cumulativeCapacitorLengthMM = 0.0;
 
+		// and length of trace will allow coil resistance to be calculated
+		double cumulativeCoilLengthMM = 0.0;
+
 		for (long spiralCounter = 0; spiralCounter < turnsTotal; spiralCounter++)
 		{
 
@@ -320,8 +323,11 @@ public class SpiralInductorFootprintGenerator
 	                                {
 	                                        cumulativeCapacitorLengthMM +=
 	                                                calculateSegmentLength(x1, y1, x2, y2)
-	                                                + (radiusIncrementPerTurn * Math.tan(Math.PI/vertices));
+	                                                + ((radiusIncrementPerTurn/1000.0) * Math.tan(Math.PI/vertices));
 	                                }
+
+					// we add the segment length to the total coil length 
+					cumulativeCoilLengthMM += calculateSegmentLength(x1, y1, x2, y2);
 
 	                                // for gEDA we have to produce a pad description of the form
 	                                // Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
@@ -384,6 +390,9 @@ public class SpiralInductorFootprintGenerator
                         	     calculateSegmentLength(x1scaled, y1scaled, x2scaled, y2scaled);
                                 	}
 
+                                        // we add the segment length to the total coil length 
+                                        cumulativeCoilLengthMM += calculateSegmentLength(x1, y1, x2, y2);
+
 					// for gEDA we have to produce a pad description of the form
 					// Pad[X1 Y1 X2 Y2 Thickness Clearance Mask Name Number SFlags]
 
@@ -437,6 +446,13 @@ public class SpiralInductorFootprintGenerator
 		{
 			System.out.println("Inductor is helical");
 		}
+
+		System.out.print("Total coil length (mm): ");
+		System.out.format("%.4f\n", cumulativeCoilLengthMM);
+		System.out.print("DC resistance of coil assuming copper resistivity = 1.75E-8 ohm.m\n\t35.56 micron copper thickness: ");
+		System.out.format("%.4f ohm\n", (1.75E-8*(cumulativeCoilLengthMM/1000.0)/((trackWidthMM/1000.0)*(3.556E-5))));
+                System.out.print("\t71.12 micron copper thickness: ");
+                System.out.format("%.4f ohm\n", (1.75E-8*(cumulativeCoilLengthMM/1000.0)/((trackWidthMM/1000.0)*(7.112E-5))));
 
  		System.out.print("Total capacitor length (mm): ");
 		System.out.format("%.4f\n", cumulativeCapacitorLengthMM);
