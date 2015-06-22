@@ -9,6 +9,8 @@ Users will typically have a required inductance in mind, for which a certain num
 
 The utility now calculates distributed capacitance and inductance for the inductor, as well as the resulting self resonant frequency, assuming an FR4 substrate and 35 micron (1 oz / ft^2) copper.
 
+The utility also calculates DC resistance for 35 and 70 micron track thicknesses.
+
 Building:
 
 download SpiralInductorFootprintGenerator.java to a working directory
