@@ -24,6 +24,7 @@
 
 import java.lang.Math;
 import java.io.*;
+import java.util.Locale;
 
 public class SpiralInductorFootprintGenerator
 {
@@ -31,6 +32,9 @@ public class SpiralInductorFootprintGenerator
 	public static void main(String[] args) throws IOException
 	{
 
+		// this should prevent continental locales from encountering comma delimiters
+		// in the mm dimensions generates by the utility
+		Locale.setDefault(new Locale("en", "US"));
 
 		// some default values for a spiral inductor vaguely OK for Qi applications
 
